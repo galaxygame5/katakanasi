@@ -165,7 +165,7 @@
 
                 <div class="bg-slate-950/60 rounded-2xl p-4 border border-purple-500/20 text-center text-sm text-purple-100 space-y-1">
                     <div>基本ルール：出題者は<strong class="text-purple-300">「カタカナ語」を使わずに</strong>通話でお題を説明！</div>
-                    <div class="text-xs text-purple-300/70">出題者がカタカナを言ったら即座に「カタカナーシ！」と指摘しよう！</div>
+                    <div class="text-xs text-purple-300/70">正解者、またはカタカナ違反を指摘したプレイヤーに1ptが入ります！</div>
                 </div>
 
                 <div class="space-y-3">
@@ -218,7 +218,15 @@
                         親: ---
                     </span>
                 </div>
-                <h2 id="questionTopic" class="text-3xl md:text-5xl font-black text-white">「------」</h2>
+                
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+                    <h2 id="questionTopic" class="text-3xl md:text-5xl font-black text-white">「------」</h2>
+                    <!-- お題パス（引き直し）ボタン -->
+                    <button id="btnRedrawTopic" onclick="redrawTopic()" class="hidden bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 font-bold px-4 py-2.5 rounded-2xl text-xs transition flex items-center gap-2 shadow-lg active:scale-95">
+                        <i class="fa-solid fa-arrows-rotate"></i> お題を引き直す (パス)
+                    </button>
+                </div>
+
                 <p id="topicGuide" class="text-xs text-purple-300/70 font-medium"></p>
             </div>
 
@@ -227,7 +235,7 @@
                 <div class="glass-panel p-6 rounded-3xl border border-purple-500/30 space-y-4 text-center">
                     <div class="bg-purple-500/10 border border-purple-400/30 rounded-2xl p-4">
                         <h3 class="text-xl font-black text-purple-200">🗣️ 通話でカタカナを使わずに説明してください！</h3>
-                        <p class="text-xs text-purple-300/70 mt-1">正解者が出たら、下のボタンを押してください（出題者と正解者にそれぞれ1pt進呈）。</p>
+                        <p class="text-xs text-purple-300/70 mt-1">正解者が出たら、下のボタンを押してください（正解者に1ptが進呈され、正解者が次の親になります）。</p>
                     </div>
 
                     <!-- 3x3 GRID PLAYERS ANSWER BUTTONS -->
@@ -322,7 +330,7 @@
     <script>
         const PREFIX = "katakanashi-online-v1-";
 
-        // カタカナーシ厳選お題リスト (約200語)
+        // カタカナーシ厳選お題リスト
         const KATAKANASHI_TOPICS = [
             "ハンバーガー", "コーヒー", "テレビ", "ボタン", "エレベーター", "サッカー", "カメラ", "チョコレート", 
             "スマートフォンの画面", "メガネのフレーム", "アイスクリーム", "タクシー", "プレゼント", "インターネット", "スーパーマーケット", 
@@ -598,6 +606,8 @@
                 processCorrectAnswer(data.winnerId);
             } else if (data.type === 'CLAIM_KATAKANA_VIOLATION') {
                 processKatakanaViolation(data.claimerId);
+            } else if (data.type === 'REDRAW_TOPIC') {
+                processRedrawTopic();
             } else if (data.type === 'SKIP_ROUND') {
                 processSkipRound();
             } else if (data.type === 'RESTART') {
@@ -655,16 +665,23 @@
             broadcastState();
         }
 
+        function processRedrawTopic() {
+            playSound('tap');
+            const newTopic = KATAKANASHI_TOPICS[Math.floor(Math.random() * KATAKANASHI_TOPICS.length)];
+            roomData.question = newTopic;
+            addLog(`🔄 出題者 ${roomData.players[roomData.presenterId].name} がお題を引き直しました。`);
+            showNotice("🔄", "お題変更", "お題を引き直しました！", 1500);
+            broadcastState();
+        }
+
         function processCorrectAnswer(winnerId) {
             playSound('success');
             const winner = roomData.players[winnerId];
-            const presenter = roomData.players[roomData.presenterId];
 
+            // 正解者のみに +1pt（出題者には入れない）
             winner.score += 1;
-            presenter.score += 1;
 
             addLog(`🎯 ${winner.name} が見事正解！ お題:「${roomData.question}」 (+1pt)`);
-            addLog(`👏 出題者 ${presenter.name} も正解に導いたため +1pt!`);
 
             showNotice("🎉", "正解！", `${winner.name} が正解しました！`, 2000);
 
@@ -684,6 +701,7 @@
             const claimer = roomData.players[claimerId];
             const presenter = roomData.players[roomData.presenterId];
 
+            // 指摘者のみに +1pt
             claimer.score += 1;
 
             addLog(`🚨 ${claimer.name} が「カタカナーシ！」と指摘！ (${presenter.name} がカタカナを使用)`);
@@ -795,15 +813,18 @@
                 const qTopic = document.getElementById('questionTopic');
                 const qGuide = document.getElementById('topicGuide');
                 const qSubtitle = document.getElementById('topicSubtitle');
+                const btnRedraw = document.getElementById('btnRedrawTopic');
 
                 if (isPresenter) {
                     qSubtitle.innerText = 'あなたへのお題（秘密）';
                     qTopic.innerText = `「${roomData.question}」`;
                     qGuide.innerText = '※カタカナを使わずに通話で説明してください！正解者が出たら下のボタンを押しましょう。';
+                    btnRedraw.classList.remove('hidden');
                 } else {
                     qSubtitle.innerText = '回答者の表示';
                     qTopic.innerText = `❓ ❓ ❓`;
                     qGuide.innerText = '※出題者の通話での説明を聞いて、分かったら声を出して答えましょう！';
+                    btnRedraw.classList.add('hidden');
                 }
 
                 const subPresenter = document.getElementById('subViewPresenter');
@@ -905,6 +926,15 @@
         }
 
         // --- ACTIONS ---
+
+        window.redrawTopic = function() {
+            playSound('tap');
+            if (isHost) {
+                processRedrawTopic();
+            } else {
+                hostConn.send({ type: 'REDRAW_TOPIC' });
+            }
+        };
 
         window.submitCorrectAnswer = function(winnerId) {
             playSound('tap');
