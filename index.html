@@ -227,7 +227,7 @@
                     </button>
                 </div>
 
-                <p id="topicGuide" class="text-xs text-purple-300/70 font-medium"></p>
+                <div id="topicGuide" class="text-xs font-medium space-y-1"></div>
             </div>
 
             <!-- SUB-VIEW A: 出題者（親）画面 -->
@@ -269,7 +269,7 @@
                         <button onclick="claimKatakanaViolation()" class="w-full bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-black text-xl py-5 rounded-2xl shadow-xl shadow-rose-600/30 transition transform active:scale-95 flex items-center justify-center gap-2">
                             <span>🚨 カタカナーシ！と指摘する</span>
                         </button>
-                        <p class="text-[11px] text-purple-300/60">※あなたが真っ先に指摘できたらボタンを押してください（指摘者に1pt進呈）。</p>
+                        <p class="text-[11px] text-purple-300/60">※あなたが真っ先に指摘できたらボタンを押してください（1pt獲得＋あなたが次の親に交代！）。</p>
                     </div>
                 </div>
             </div>
@@ -755,12 +755,17 @@
             claimer.score += 1;
 
             addLog(`🚨 ${claimer.name} が「カタカナーシ！」と指摘！ (${presenter.name} がカタカナを使用)`);
-            addLog(`⭐ 指摘した ${claimer.name} が 1pt 獲得！`);
+            addLog(`⭐ 指摘した ${claimer.name} が 1pt 獲得＆次の親へ交代！`);
 
-            showNotice("🚨", "カタカナーシ！", `${claimer.name} の指摘が成功！`, 2000);
+            showNotice("🚨", "カタカナーシ！", `${claimer.name} の指摘成功！(次の親へ)`, 2000);
 
-            // 指摘されたら出題者を次のプレイヤーへ交代
-            roomData.turnIndex++;
+            // ★変更点：指摘した本人が次の親（出題者）になる
+            const nextIdx = roomData.turnOrder.indexOf(claimerId);
+            if (nextIdx !== -1) {
+                roomData.turnIndex = nextIdx;
+            } else {
+                roomData.turnIndex++;
+            }
 
             checkGameEndConditions();
         }
@@ -868,12 +873,17 @@
                 if (isPresenter) {
                     qSubtitle.innerText = 'あなたへのお題（秘密）';
                     qTopic.innerText = `「${roomData.question}」`;
-                    qGuide.innerText = '※カタカナを使わずに通話で説明してください！正解者が出たら下のボタンを押しましょう。';
+                    qGuide.innerHTML = `
+                        <p class="text-purple-300/80">※カタカナを使わずに通話で説明してください！正解者が出たら下のボタンを押しましょう。</p>
+                        <p class="text-rose-400 font-black tracking-wide bg-rose-500/10 border border-rose-500/20 py-1 px-3 rounded-xl inline-block">
+                            ⚠️ お題の言葉をそのまま和訳・直訳するのはNGです！
+                        </p>
+                    `;
                     btnRedraw.classList.remove('hidden');
                 } else {
                     qSubtitle.innerText = '回答者の表示';
                     qTopic.innerText = `❓ ❓ ❓`;
-                    qGuide.innerText = '※出題者の通話での説明を聞いて、分かったら声を出して答えましょう！';
+                    qGuide.innerHTML = `<p class="text-purple-300/80">※出題者の通話での説明を聞いて、分かったら声を出して答えましょう！</p>`;
                     btnRedraw.classList.add('hidden');
                 }
 
